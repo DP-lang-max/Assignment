@@ -24,10 +24,17 @@ namespace TechnicalTAsk.Pages
             var sourceElement = driver.FindElement(By.XPath(string.Format(menuItemXPath, menuItem)));
             var targetElement = driver.FindElement(orderTicket);
 
-            Actions actions = new Actions(driver);
-            actions.DragAndDrop(sourceElement, targetElement).Perform();
-            logger.Info("Drag and drop action performed successfully");
-
+            try
+            {
+                Actions actions = new Actions(driver);
+                actions.DragAndDrop(sourceElement, targetElement).Perform();
+                logger.Info("Drag and drop action performed successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Drag and drop action failed: {ex.Message}. Attempting with JavaScript.");
+                ExecuteJavaScriptDragAndDrop(sourceElement, targetElement);
+            }
             // Assert that the border color is as expected
             var borderColor = targetElement.GetCssValue("border");
             if (borderColor.Contains("rgb(0, 162, 152)"))
@@ -56,6 +63,49 @@ namespace TechnicalTAsk.Pages
             }
             logger.Warn($"Item '{menuItem}' was NOT found in the Order Ticket");
             return false;
+        }
+
+        // Method to perform drag and drop using JavaScript
+        private void ExecuteJavaScriptDragAndDrop(IWebElement source, IWebElement destination)
+        {
+            var script = @"
+                function simulateDragDrop(sourceNode, destinationNode) {
+                    var dataTransfer = new DataTransfer();
+
+                    var dragStartEvent = new DragEvent('dragstart', {
+                        bubbles: true,
+                        cancelable: true,
+                        dataTransfer: dataTransfer
+                    });
+                    sourceNode.dispatchEvent(dragStartEvent);
+
+                    var dragOverEvent = new DragEvent('dragover', {
+                        bubbles: true,
+                        cancelable: true,
+                        dataTransfer: dataTransfer
+                    });
+                    destinationNode.dispatchEvent(dragOverEvent);
+
+                    var dropEvent = new DragEvent('drop', {
+                        bubbles: true,
+                        cancelable: true,
+                        dataTransfer: dataTransfer
+                    });
+                    destinationNode.dispatchEvent(dropEvent);
+
+                    var dragEndEvent = new DragEvent('dragend', {
+                        bubbles: true,
+                        cancelable: true,
+                        dataTransfer: dataTransfer
+                    });
+                    sourceNode.dispatchEvent(dragEndEvent);
+                }
+
+                simulateDragDrop(arguments[0], arguments[1]);
+            ";
+
+            ((IJavaScriptExecutor)driver).ExecuteScript(script, source, destination);
+            logger.Info("Drag and drop action performed successfully using JavaScript");
         }
     }
 }
